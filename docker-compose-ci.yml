@@ -2,4 +2,4 @@ version: "2"
 services:
   test:
     build: .
-    command: go test ./integration
+    command: go test -v ./integration
