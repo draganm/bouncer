@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/draganm/web-interceptor/proxy"
+	"github.com/gorilla/websocket"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -18,11 +19,33 @@ func TestIntegration(t *testing.T) {
 	RunSpecs(t, "Integration Suite")
 }
 
+var upgrader = websocket.Upgrader{} // use default options
+
 var _ = BeforeSuite(func(done Done) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("test"))
-		w.WriteHeader(200)
+		// w.WriteHeader(200)
+	})
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		c, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Print("upgrade:", err)
+			return
+		}
+		defer c.Close()
+		for {
+			mt, message, err := c.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				break
+			}
+			err = c.WriteMessage(mt, message)
+			if err != nil {
+				log.Println("write:", err)
+				break
+			}
+		}
 	})
 	go http.ListenAndServe("localhost:8081", mux)
 	for {
@@ -48,6 +71,45 @@ var _ = BeforeSuite(func(done Done) {
 var _ = Describe("simple proxy", func() {
 
 	Describe("GET request", func() {
+
+		Context("When upgrading to an WebSockets connection", func() {
+			var err error
+			var c *websocket.Conn
+			BeforeEach(func() {
+				c, _, err = websocket.DefaultDialer.Dial("ws://localhost:8080/ws", nil)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("Should not fail", func() {
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			Context("When I send a text message through the socket", func() {
+				BeforeEach(func() {
+					Expect(c.WriteMessage(websocket.TextMessage, []byte("test"))).To(Succeed())
+				})
+				Context("And I read the message sent back", func() {
+					var tpe int
+					var message []byte
+					var err error
+					BeforeEach(func() {
+						tpe, message, err = c.ReadMessage()
+					})
+
+					It("Should not to fail", func() {
+						Expect(err).ToNot(HaveOccurred())
+					})
+					It("Should have text message type", func() {
+						Expect(tpe).To(Equal(websocket.TextMessage))
+					})
+					It("Should have the same message body as sent", func() {
+						Expect(string(message)).To(Equal("test"))
+					})
+				})
+			})
+
+		})
+
 		Context("When requesting existing resource through the proxy", func() {
 			var response *http.Response
 			BeforeEach(func() {
