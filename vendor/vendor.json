@@ -3,6 +3,18 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "dyGQP5AipmInoTQmnqvbFmUORpk=",
+			"path": "github.com/gorilla/websocket",
+			"revision": "3ddc98405808dc90b76f43a2eddca8f12e244e2b",
+			"revisionTime": "2016-06-01T05:17:19Z"
+		},
+		{
+			"checksumSHA1": "SYAsHyJsoKXI9zWa/DTRvMWgGHM=",
+			"path": "github.com/koding/websocketproxy",
+			"revision": "870493fd19c48c3e71eaf5c5e03e07658f73bd26",
+			"revisionTime": "2015-11-28T20:04:38Z"
+		},
+		{
 			"checksumSHA1": "UwhLtKi/lHjArxgsqRe6iqSEu3I=",
 			"path": "github.com/onsi/ginkgo",
 			"revision": "5437a97bf824dec14e58d68c56ee36e772670c2e",
