@@ -1,5 +1,8 @@
 version: "2"
 services:
   test:
-    build: .
-    command: go test -v ./integration
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+    command: ["go test -v ."]
+    entrypoint: ["/bin/sh", "-c"]

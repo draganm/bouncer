@@ -1,4 +1,4 @@
-package proxy
+package bouncer
 
 import (
 	"net/http"
@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/koding/websocketproxy"
+	"github.com/urfave/negroni"
 )
 
-func Proxy(addr, remote string) error {
+func Proxy(addr, remote string, handlers ...negroni.Handler) error {
 	u, err := url.Parse(remote)
 	if err != nil {
 		return err
@@ -20,7 +21,9 @@ func Proxy(addr, remote string) error {
 	}
 	proxy := httputil.NewSingleHostReverseProxy(u)
 	wsProxy := websocketproxy.NewProxy(wsURL)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+	m := http.NewServeMux()
+	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.ToLower(r.Header.Get("Connection")) == "upgrade" {
 			wsProxy.ServeHTTP(w, r)
 			return
@@ -28,5 +31,9 @@ func Proxy(addr, remote string) error {
 		proxy.ServeHTTP(w, r)
 	})
 
-	return http.ListenAndServe(addr, nil)
+	n := negroni.New(handlers...)
+	n.UseHandler(m)
+	n.Run(addr)
+	return nil
+	// return http.ListenAndServe(addr, m)
 }

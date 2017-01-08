@@ -1,4 +1,4 @@
-package integration_test
+package bouncer_test
 
 import (
 	"io/ioutil"
@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/draganm/web-interceptor/proxy"
+	"github.com/draganm/bouncer"
 	"github.com/gorilla/websocket"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/urfave/negroni"
 
 	"testing"
 )
@@ -56,7 +57,14 @@ var _ = BeforeSuite(func(done Done) {
 		log.Println(err)
 		time.Sleep(time.Millisecond * 10)
 	}
-	go proxy.Proxy(":8080", "http://localhost:8081")
+	go bouncer.Proxy(":8080", "http://localhost:8081", negroni.HandlerFunc(func(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+		if r.URL.Path == "/intercept" {
+			w.Write([]byte("intercepted"))
+			return
+		}
+
+		next(w, r)
+	}))
 	for {
 		_, err := http.Get("http://localhost:8080")
 		if err == nil {
@@ -71,6 +79,52 @@ var _ = BeforeSuite(func(done Done) {
 var _ = Describe("simple proxy", func() {
 
 	Describe("GET request", func() {
+
+		Context("When requesting existing resource through the proxy", func() {
+			var response *http.Response
+			BeforeEach(func() {
+				var err error
+				response, err = http.Get("http://localhost:8080/")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AfterEach(func() {
+				response.Body.Close()
+			})
+
+			It("Should respond with 200 status code", func() {
+				Expect(response.StatusCode).To(Equal(200))
+			})
+
+			It("Should forward original response body", func() {
+				data, err := ioutil.ReadAll(response.Body)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(data)).To(Equal("test"))
+			})
+
+		})
+
+		Context("When requesting resource intercepted by proxy", func() {
+			var response *http.Response
+			BeforeEach(func() {
+				var err error
+				response, err = http.Get("http://localhost:8080/intercept")
+				Expect(err).ToNot(HaveOccurred())
+			})
+			AfterEach(func() {
+				response.Body.Close()
+			})
+
+			It("Should respond with 200 status code", func() {
+				Expect(response.StatusCode).To(Equal(200))
+			})
+
+			It("Should return body created by interceptor", func() {
+				data, err := ioutil.ReadAll(response.Body)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(data)).To(Equal("intercepted"))
+			})
+		})
 
 		Context("When upgrading to an WebSockets connection", func() {
 			var err error
@@ -110,28 +164,5 @@ var _ = Describe("simple proxy", func() {
 
 		})
 
-		Context("When requesting existing resource through the proxy", func() {
-			var response *http.Response
-			BeforeEach(func() {
-				var err error
-				response, err = http.Get("http://localhost:8080/")
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			AfterEach(func() {
-				response.Body.Close()
-			})
-
-			It("Should respond with 200 status code", func() {
-				Expect(response.StatusCode).To(Equal(200))
-			})
-
-			It("Should forward original response body", func() {
-				data, err := ioutil.ReadAll(response.Body)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(string(data)).To(Equal("test"))
-			})
-
-		})
 	})
 })
