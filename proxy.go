@@ -22,17 +22,16 @@ func Proxy(addr, remote string, handlers ...negroni.Handler) error {
 	proxy := httputil.NewSingleHostReverseProxy(u)
 	wsProxy := websocketproxy.NewProxy(wsURL)
 
-	m := http.NewServeMux()
-	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	h := func(w http.ResponseWriter, r *http.Request) {
 		if strings.ToLower(r.Header.Get("Connection")) == "upgrade" {
 			wsProxy.ServeHTTP(w, r)
 			return
 		}
 		proxy.ServeHTTP(w, r)
-	})
+	}
 
 	n := negroni.New(handlers...)
-	n.UseHandler(m)
+	n.UseHandler(http.HandlerFunc(h))
 	n.Run(addr)
 	return nil
 	// return http.ListenAndServe(addr, m)
