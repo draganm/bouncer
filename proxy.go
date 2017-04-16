@@ -11,13 +11,21 @@ import (
 )
 
 func Proxy(addr, remote string, handlers ...negroni.Handler) error {
-	u, err := url.Parse(remote)
+	handler, err := ProxyHandler(remote, handlers...)
 	if err != nil {
 		return err
 	}
+	return http.ListenAndServe(addr, handler)
+}
+
+func ProxyHandler(remote string, handlers ...negroni.Handler) (http.Handler, error) {
+	u, err := url.Parse(remote)
+	if err != nil {
+		return nil, err
+	}
 	wsURL, err := url.Parse(strings.Replace(remote, "http", "ws", 1))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	proxy := httputil.NewSingleHostReverseProxy(u)
 	wsProxy := websocketproxy.NewProxy(wsURL)
@@ -33,7 +41,6 @@ func Proxy(addr, remote string, handlers ...negroni.Handler) error {
 
 	n := negroni.New(handlers...)
 	n.UseHandler(m)
-	n.Run(addr)
-	return nil
-	// return http.ListenAndServe(addr, m)
+
+	return n, nil
 }
